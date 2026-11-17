@@ -336,14 +336,14 @@ Fetches hyper-local meteorological conditions from Open-Meteo with automated bil
     "success": true,
     "district": "Mandya",
     "temperature_c": 28.5,
-    "condition": "Partly Cloudy",
-    "weather_code": 2,
     "humidity_pct": 62,
     "wind_speed_kmh": 11.2,
     "rain_chance_pct": 15,
+    "condition": "Partly Cloudy",
     "advisory_en": "Dry and favorable weather. Ideal for harvesting, drying grains, and spraying.",
     "advisory_kn": "ಒಣ ಹವೆ ಮತ್ತು ಅನುಕೂಲಕರ ವಾತಾವರಣ. ಕಟಾವು, ಧಾನ್ಯ ಒಣಗಿಸಲು ಮತ್ತು ಸಿಂಪಡಣೆಗೆ ಸೂಕ್ತವಾಗಿದೆ.",
-    "updated_at": "2026-11-17T09:44:24.275409+05:30"
+    "source": "Open-Meteo (Live)",
+    "is_live": true
   }
   ```
 

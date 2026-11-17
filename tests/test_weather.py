@@ -16,7 +16,7 @@ class WeatherApiTests(unittest.IsolatedAsyncioTestCase):
     def tearDown(self):
         self.cache_patch.stop()
 
-    def test_weather_endpoint_with_mocked_upstream(self):
+    def test_weather_endpoint_with_mocked_open_meteo(self):
         mock_response = MagicMock()
         mock_response.status_code = 200
         mock_response.json.return_value = {
@@ -46,6 +46,8 @@ class WeatherApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(data["temperature_c"], 29.4)
         self.assertEqual(data["humidity_pct"], 62)
         self.assertEqual(data["rain_chance_pct"], 15)
+        self.assertEqual(data["source"], "Open-Meteo (Live)")
+        self.assertTrue(data["is_live"])
         self.assertIn("Dry and favorable", data["advisory_en"])
         self.assertIn("ಒಣ ಹವೆ", data["advisory_kn"])
 
@@ -80,11 +82,49 @@ class WeatherApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertIn("Postpone pesticide spraying", data["advisory_en"])
         self.assertIn("ಕೀಟನಾಶಕ ಸಿಂಪಡಣೆಯನ್ನು ಮುಂದೂಡಿ", data["advisory_kn"])
 
-    def test_weather_endpoint_fallback_on_network_failure(self):
+    def test_weather_fallback_to_wttr_when_open_meteo_fails(self):
+        # Open-Meteo throws error, wttr.in succeeds
+        def get_mock(url, **kwargs):
+            if "open-meteo.com" in url:
+                raise Exception("Render 429 Rate Limit on Open-Meteo")
+            elif "wttr.in" in url:
+                mock_resp = MagicMock()
+                mock_resp.status_code = 200
+                mock_resp.json.return_value = {
+                    "current_condition": [
+                        {
+                            "temp_C": "26.0",
+                            "humidity": "58",
+                            "windspeedKmph": "9.5",
+                            "weatherDesc": [{"value": "Sunny"}],
+                        }
+                    ]
+                }
+                return mock_resp
+            raise ValueError("Unknown URL")
+
         mock_http_client = MagicMock()
         mock_http_client.__aenter__ = AsyncMock(return_value=mock_http_client)
         mock_http_client.__aexit__ = AsyncMock(return_value=None)
-        mock_http_client.get = AsyncMock(side_effect=Exception("Network error"))
+        mock_http_client.get = AsyncMock(side_effect=get_mock)
+
+        with patch.object(weather_services.httpx, "AsyncClient", return_value=mock_http_client):
+            response = self.client.get("/api/v1/weather?district=Mysuru")
+
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertTrue(data["success"])
+        self.assertEqual(data["district"], "Mysuru")
+        self.assertEqual(data["temperature_c"], 26.0)
+        self.assertEqual(data["condition"], "Sunny")
+        self.assertEqual(data["source"], "wttr.in (Live)")
+        self.assertTrue(data["is_live"])
+
+    def test_weather_endpoint_fallback_when_both_fail(self):
+        mock_http_client = MagicMock()
+        mock_http_client.__aenter__ = AsyncMock(return_value=mock_http_client)
+        mock_http_client.__aexit__ = AsyncMock(return_value=None)
+        mock_http_client.get = AsyncMock(side_effect=Exception("Total network outage"))
 
         with patch.object(weather_services.httpx, "AsyncClient", return_value=mock_http_client):
             response = self.client.get("/api/v1/weather?district=Bangalore")
@@ -93,8 +133,9 @@ class WeatherApiTests(unittest.IsolatedAsyncioTestCase):
         data = response.json()
         self.assertTrue(data["success"])
         self.assertEqual(data["district"], "Bangalore Urban")
-        self.assertEqual(data["temperature_c"], 28.0)
-        self.assertIn("Normal seasonal conditions", data["advisory_en"])
+        self.assertEqual(data["temperature_c"], 22.0)
+        self.assertFalse(data["is_live"])
+        self.assertIn("Normal seasonal conditions across Karnataka", data["advisory_en"])
 
     async def test_weather_service_direct_call_with_lat_lon(self):
         data = await weather_services.get_weather_data(lat=12.52, lon=76.89, force_refresh=True)
