@@ -75,7 +75,8 @@ class WeatherApiTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(response.status_code, 200)
         data = response.json()
         self.assertEqual(data["district"], "Kolar")
-        self.assertEqual(data["condition"], "Rain Expected")
+        self.assertEqual(data["condition"], "Rain")
+        self.assertTrue(data.get("is_live"))
         self.assertIn("Postpone pesticide spraying", data["advisory_en"])
         self.assertIn("ಕೀಟನಾಶಕ ಸಿಂಪಡಣೆಯನ್ನು ಮುಂದೂಡಿ", data["advisory_kn"])
 
